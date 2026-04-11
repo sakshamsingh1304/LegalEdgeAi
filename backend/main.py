@@ -14,12 +14,23 @@ load_dotenv(dotenv_path=ENV_PATH)
 # Add src to path so we can import rag_groq
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
-try:
-    from rag_groq import generate_answer
-except ImportError as e:
-    print(f"Error importing rag_groq: {e}")
-    # Fallback to avoid crash if env not set up yet
-    generate_answer = None
+# Lazy-load RAG module — sentence-transformers takes minutes to load,
+# which causes Render to timeout waiting for port binding.
+# The model will load on first /api/chat request instead.
+_generate_answer = None
+
+def get_generate_answer():
+    global _generate_answer
+    if _generate_answer is None:
+        try:
+            print("Loading RAG module (first request — this may take a minute)...")
+            from rag_groq import generate_answer
+            _generate_answer = generate_answer
+            print("RAG module loaded successfully!")
+        except ImportError as e:
+            print(f"Error importing rag_groq: {e}")
+            _generate_answer = None
+    return _generate_answer
 
 import pickle
 METADATA_PATH = os.path.join(os.path.dirname(__file__), "metadata.pkl")
@@ -430,12 +441,13 @@ async def search_documents(q: str):
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
-    if generate_answer is None:
+    gen_answer = get_generate_answer()
+    if gen_answer is None:
         raise HTTPException(status_code=500, detail="Backend RAG module not loaded correctly")
         
     try:
         # Get answer from RAG
-        answer, sources_raw = generate_answer(request.query)
+        answer, sources_raw = gen_answer(request.query)
         
         mapped_sources = []
         seen_sources = set()
