@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+groq
+sentence-transformers
+faiss-cpu
+numpy
+python-dotenv
+psycopg2-binary

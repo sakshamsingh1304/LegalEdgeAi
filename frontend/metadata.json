@@ -1,0 +1,9 @@
+{
+  "name": "Startup Legal & Finance Assistant",
+  "description": "A RAG-powered assistant for founders to navigate company registration, GST, funding rules, and tax compliance using verified government sources.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
