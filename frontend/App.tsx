@@ -13,7 +13,36 @@ import LoginPage from './pages/LoginPage';
 import { Particles } from './components/ui/particles';
 import { NotificationProvider } from './lib/NotificationContext';
 import { AuthProvider, useAuth } from './lib/AuthContext';
-import { Loader2 } from 'lucide-react';
+import { BackendStatusProvider, useBackendStatus } from './lib/BackendStatusContext';
+import { Loader2, Wifi, WifiOff } from 'lucide-react';
+
+const ColdStartBanner: React.FC = () => {
+  const { status } = useBackendStatus();
+
+  if (status === 'online' || status === 'checking') return null;
+
+  return (
+    <div className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${
+      status === 'offline'
+        ? 'bg-red-600/90 backdrop-blur-sm'
+        : 'bg-amber-600/90 backdrop-blur-sm'
+    }`}>
+      <div className="flex items-center justify-center gap-2 py-2 px-4 text-white text-xs font-medium">
+        {status === 'waking' ? (
+          <>
+            <Loader2 className="animate-spin" size={14} />
+            <span>Backend is waking up (free tier cold start) — please wait...</span>
+          </>
+        ) : (
+          <>
+            <WifiOff size={14} />
+            <span>Backend is unreachable. Please check your connection or try again later.</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const AuthenticatedApp: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark' | 'dim'>('dark');
@@ -24,6 +53,9 @@ const AuthenticatedApp: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background text-primary flex flex-col relative overflow-hidden transition-colors duration-500">
+      {/* Cold Start Banner */}
+      <ColdStartBanner />
+
       {/* Global Background Particles */}
       <Particles
         color={theme === 'light' ? "#000000" : "#ffffff"}
@@ -94,9 +126,11 @@ const App: React.FC = () => {
   return (
     <Router>
       <AuthProvider>
-        <NotificationProvider>
-          <AppRouter />
-        </NotificationProvider>
+        <BackendStatusProvider>
+          <NotificationProvider>
+            <AppRouter />
+          </NotificationProvider>
+        </BackendStatusProvider>
       </AuthProvider>
     </Router>
   );

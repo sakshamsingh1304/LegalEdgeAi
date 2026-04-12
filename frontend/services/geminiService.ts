@@ -1,4 +1,5 @@
 import { Source } from '../types';
+import { fetchWithRetry } from '../lib/fetchWithRetry';
 
 const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/chat`;
 
@@ -13,13 +14,23 @@ const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/
  */
 export const streamRagApi = async (query: string, onChunk: (text: string) => void) => {
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const response = await fetchWithRetry(
+      API_URL,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
       },
-      body: JSON.stringify({ query }),
-    });
+      {
+        maxRetries: 3,
+        initialDelayMs: 3000,
+        onRetry: (attempt, max) => {
+          onChunk(`⏳ Backend is waking up... retrying (${attempt}/${max})`);
+        },
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`API Error: ${response.statusText}`);
@@ -39,7 +50,7 @@ export const streamRagApi = async (query: string, onChunk: (text: string) => voi
     };
   } catch (error) {
     console.error("Backend API Error:", error);
-    onChunk("Error connecting to backend service. Please ensure the backend is running.");
+    onChunk("⚠️ Could not connect to the backend. It may be starting up — please try again in a few seconds.");
     return { content: "", sources: [] };
   }
 };

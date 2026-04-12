@@ -1,4 +1,11 @@
+import { fetchWithRetry } from '../lib/fetchWithRetry';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+const retryOpts = {
+  maxRetries: 3,
+  initialDelayMs: 2000,
+};
 
 export interface Conversation {
   id: string;
@@ -19,7 +26,7 @@ export interface ChatMessage {
 
 export const getConversations = async (userId: string): Promise<Conversation[]> => {
   try {
-    const res = await fetch(`${API_URL}/api/conversations?user_id=${userId}`);
+    const res = await fetchWithRetry(`${API_URL}/api/conversations?user_id=${userId}`, undefined, retryOpts);
     if (!res.ok) throw new Error('Failed to fetch conversations');
     return await res.json();
   } catch (error) {
@@ -30,7 +37,7 @@ export const getConversations = async (userId: string): Promise<Conversation[]> 
 
 export const getMessages = async (conversationId: string): Promise<ChatMessage[]> => {
   try {
-    const res = await fetch(`${API_URL}/api/conversations/${conversationId}/messages`);
+    const res = await fetchWithRetry(`${API_URL}/api/conversations/${conversationId}/messages`, undefined, retryOpts);
     if (!res.ok) throw new Error('Failed to fetch messages');
     return await res.json();
   } catch (error) {
@@ -41,11 +48,11 @@ export const getMessages = async (conversationId: string): Promise<ChatMessage[]
 
 export const createConversation = async (userId: string, title: string = 'New Chat'): Promise<Conversation | null> => {
   try {
-    const res = await fetch(`${API_URL}/api/conversations`, {
+    const res = await fetchWithRetry(`${API_URL}/api/conversations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, title }),
-    });
+    }, retryOpts);
     if (!res.ok) throw new Error('Failed to create conversation');
     return await res.json();
   } catch (error) {
@@ -61,11 +68,11 @@ export const saveMessage = async (
   sources?: any[]
 ): Promise<ChatMessage | null> => {
   try {
-    const res = await fetch(`${API_URL}/api/conversations/${conversationId}/messages`, {
+    const res = await fetchWithRetry(`${API_URL}/api/conversations/${conversationId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role, content, sources }),
-    });
+    }, retryOpts);
     if (!res.ok) throw new Error('Failed to save message');
     return await res.json();
   } catch (error) {
@@ -76,9 +83,9 @@ export const saveMessage = async (
 
 export const deleteConversation = async (conversationId: string): Promise<boolean> => {
   try {
-    const res = await fetch(`${API_URL}/api/conversations/${conversationId}`, {
+    const res = await fetchWithRetry(`${API_URL}/api/conversations/${conversationId}`, {
       method: 'DELETE',
-    });
+    }, retryOpts);
     return res.ok;
   } catch (error) {
     console.error('Error deleting conversation:', error);
@@ -88,11 +95,11 @@ export const deleteConversation = async (conversationId: string): Promise<boolea
 
 export const updateConversationTitle = async (conversationId: string, title: string): Promise<boolean> => {
   try {
-    const res = await fetch(`${API_URL}/api/conversations/${conversationId}`, {
+    const res = await fetchWithRetry(`${API_URL}/api/conversations/${conversationId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title }),
-    });
+    }, retryOpts);
     return res.ok;
   } catch (error) {
     console.error('Error updating conversation title:', error);
