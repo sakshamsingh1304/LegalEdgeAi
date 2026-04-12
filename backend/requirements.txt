@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 groq
-sentence-transformers
+requests
 faiss-cpu
 numpy
 python-dotenv

@@ -3,7 +3,7 @@ import pickle
 import numpy as np
 import os
 from pathlib import Path
-from sentence_transformers import SentenceTransformer
+import requests
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -14,8 +14,25 @@ load_dotenv(dotenv_path=ENV_PATH)
 # CONFIG
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# Embedding model 
-embed_model = SentenceTransformer("all-MiniLM-L6-v2")
+# Embedding model using HF Inference API
+HF_API_KEY = os.getenv("HF_API_KEY")
+HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+
+def get_embedding(text):
+    if not HF_API_KEY:
+        print("HF_API_KEY missing - search will fail.")
+        return [0.0] * 384
+    try:
+        headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+        res = requests.post(HF_API_URL, headers=headers, json={"inputs": [text]})
+        if res.status_code == 200:
+            result = res.json()
+            if isinstance(result, list) and len(result) > 0:
+                return result[0] if isinstance(result[0], list) else result
+        print(f"HF API Error: {res.status_code} - {res.text}")
+    except Exception as e:
+        print(f"HF request failed: {e}")
+    return [0.0] * 384
 
 # Paths relative to this script
 BASE_DIR = Path(__file__).resolve().parent.parent # Assuming src/rag_groq.py, data is in parent/data or same dir?
@@ -61,7 +78,8 @@ def retrieve(query, top_k=10):
     if index is None:
         return []
         
-    query_embedding = embed_model.encode([query])
+    # Use API instead of local heavy model
+    query_embedding = [get_embedding(query)]
     distances, indices = index.search(np.array(query_embedding), top_k)
 
     results = []
