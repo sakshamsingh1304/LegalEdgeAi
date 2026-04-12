@@ -16,7 +16,7 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # Embedding model using HF Inference API
 HF_API_KEY = os.getenv("HF_API_KEY")
-HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+HF_API_URL = "https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction"
 
 def get_embedding(text):
     if not HF_API_KEY:

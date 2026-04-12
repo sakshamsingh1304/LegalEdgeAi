@@ -28,6 +28,7 @@ const ChatPage: React.FC = () => {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loadingConversations, setLoadingConversations] = useState(true);
+  const preventNextLoad = useRef(false);
 
   useEffect(() => {
     isMounted.current = true;
@@ -53,6 +54,10 @@ const ChatPage: React.FC = () => {
 
   // Load messages when active conversation changes
   useEffect(() => {
+    if (preventNextLoad.current) {
+      preventNextLoad.current = false;
+      return;
+    }
     if (activeConversationId) {
       loadMessages(activeConversationId);
     } else {
@@ -147,6 +152,7 @@ const ChatPage: React.FC = () => {
       const newConv = await createConversation(user.uid, title);
       if (newConv) {
         convId = newConv.id;
+        preventNextLoad.current = true;
         setActiveConversationId(convId);
         setConversations(prev => [newConv, ...prev]);
       }
