@@ -339,38 +339,45 @@ const ChatPage: React.FC = () => {
         </header>
 
         <div className="flex-grow overflow-y-auto p-4 space-y-6" ref={scrollRef}>
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-2xl p-4 ${msg.role === 'user'
-                ? 'bg-emerald-600 text-white rounded-tr-none shadow-lg shadow-emerald-600/10'
-                : 'glass text-primary rounded-tl-none border border-border'
-                }`}>
-                {msg.files && msg.files.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {msg.files.map((f, i) => (
-                      <div key={i} className="flex items-center gap-2 bg-surface-hover px-2 py-1 rounded-md text-xs border border-border">
-                        <FileText size={12} />
-                        <span>{f.name}</span>
-                      </div>
-                    ))}
+          {messages.map((msg, index) => {
+            // Hide the empty assistant message bubble if we are showing the "Consulting..." loader
+            if (isLoading && index === messages.length - 1 && msg.role === 'assistant' && !msg.content) {
+              return null;
+            }
+
+            return (
+              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-2xl p-4 ${msg.role === 'user'
+                  ? 'bg-emerald-600 text-white rounded-tr-none shadow-lg shadow-emerald-600/10'
+                  : 'glass text-primary rounded-tl-none border border-border'
+                  }`}>
+                  {msg.files && msg.files.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {msg.files.map((f, i) => (
+                        <div key={i} className="flex items-center gap-2 bg-surface-hover px-2 py-1 rounded-md text-xs border border-border">
+                          <FileText size={12} />
+                          <span>{f.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="whitespace-pre-wrap leading-relaxed text-sm md:text-base max-w-none">
+                    <span className="text-current">
+                      {msg.role === 'assistant' ? (
+                        <TextGenerateEffect words={msg.content || "..."} duration={0.3} filter={false} className="text-current" />
+                      ) : (
+                        msg.content
+                      )}
+                    </span>
+                    {!msg.content && msg.role === 'assistant' && <span className="inline-block w-2 h-4 bg-emerald-500 animate-pulse ml-1"></span>}
                   </div>
-                )}
-                <div className="whitespace-pre-wrap leading-relaxed text-sm md:text-base max-w-none">
-                  <span className="text-current">
-                    {msg.role === 'assistant' ? (
-                      <TextGenerateEffect words={msg.content || "..."} duration={0.3} filter={false} className="text-current" />
-                    ) : (
-                      msg.content
-                    )}
-                  </span>
-                  {!msg.content && msg.role === 'assistant' && <span className="inline-block w-2 h-4 bg-emerald-500 animate-pulse ml-1"></span>}
-                </div>
-                <div className={`text-[10px] mt-2 ${msg.role === 'user' ? 'text-emerald-100' : 'text-muted'}`}>
-                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <div className={`text-[10px] mt-2 ${msg.role === 'user' ? 'text-emerald-100' : 'text-muted'}`}>
+                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {isLoading && !messages[messages.length - 1].content && (
             <div className="flex justify-start">
               <div className="glass rounded-2xl p-4 rounded-tl-none border border-border flex items-center gap-3">
