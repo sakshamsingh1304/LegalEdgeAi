@@ -251,7 +251,7 @@ const ChatPage: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col md:flex-row p-4 pt-4 pb-28 gap-4 overflow-hidden">
+    <div className="h-[100dvh] flex flex-col md:flex-row p-4 pt-4 pb-28 gap-4 overflow-hidden">
       {isVoiceMode && <VoiceAssistant onClose={() => setIsVoiceMode(false)} />}
 
       {/* Conversation History Sidebar */}

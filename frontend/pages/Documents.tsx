@@ -66,7 +66,7 @@ const Documents: React.FC = () => {
   };
 
   return (
-    <div className="py-20 min-h-screen bg-transparent">
+    <div className="py-20 min-h-[100dvh] bg-transparent">
       <div className="max-w-7xl mx-auto px-6 mb-12 space-y-6">
         <h1 className="text-3xl font-bold text-primary mb-8">Official Compliance Knowledge Base</h1>
 

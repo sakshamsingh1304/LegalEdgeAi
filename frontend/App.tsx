@@ -52,7 +52,7 @@ const AuthenticatedApp: React.FC = () => {
   }, [theme]);
 
   return (
-    <div className="min-h-screen bg-background text-primary flex flex-col relative overflow-hidden transition-colors duration-500">
+    <div className="min-h-[100dvh] bg-background text-primary flex flex-col relative overflow-hidden transition-colors duration-500">
       {/* Cold Start Banner */}
       <ColdStartBanner />
 
@@ -93,7 +93,7 @@ const AuthenticatedApp: React.FC = () => {
 };
 
 const LoadingScreen: React.FC = () => (
-  <div className="min-h-screen bg-[#030712] flex items-center justify-center">
+  <div className="min-h-[100dvh] bg-[#030712] flex items-center justify-center">
     <div className="flex flex-col items-center gap-4">
       <Loader2 className="animate-spin text-emerald-500" size={40} />
       <p className="text-gray-500 text-sm font-medium animate-pulse">Loading LegalEdge AI...</p>

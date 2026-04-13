@@ -181,7 +181,7 @@ const CalendarPage: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-transparent overflow-hidden pb-20">
+    <div className="flex h-[100dvh] flex-col bg-transparent overflow-hidden pb-20">
       <header className="px-8 py-4 border-b border-border/50 flex items-center justify-between glass sticky top-0 z-40">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">

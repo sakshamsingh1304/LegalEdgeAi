@@ -84,6 +84,10 @@ const PromptInputBox: React.FC<PromptInputBoxProps> = ({ onSend }) => {
             </button>
             <button 
               onClick={handleSend}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                handleSend();
+              }}
               disabled={!message.trim() && files.length === 0}
               className="p-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:opacity-50 text-white rounded-xl transition-all shadow-lg hover:shadow-emerald-500/20"
             >
