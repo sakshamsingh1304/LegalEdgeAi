@@ -1,41 +1,97 @@
-# Startup Legal & Finance Assistant
+# ⚖️ LegalEdge AI
 
-An intelligent, RAG-powered platform designed to simplify Indian startup compliance, legal regulations, and financial management.
+**LegalEdge AI** is a cutting-edge, RAG-powered (Retrieval-Augmented Generation) assistant designed specifically for Indian startups. It bridges the gap between complex legal regulations and founders by providing an AI assistant grounded in verified official documents (MCA, GST, SEBI), an interactive compliance calendar, and a centralized regulations library.
 
-## 🚀 Features
+🚀 **[Live Demo](https://legal-edge-ai-h4cf.vercel.app)**
 
-- **AI Compliance Assistant**: A Gemini-powered chat interface grounded in verified government PDFs (MCA, GST, SEBI).
-- **Compliance Calendar**: Interactive calendar that syncs manual tasks with official government document release dates.
-- **Regulations Library**: Direct access to categorized and searchable legal documents for Indian founders.
-- **Smart Notifications**: Real-time alerts for AI responses and upcoming deadlines.
-- **Dynamic UI**: Fluid theme support (Light/Dark/Dim) and responsive glassmorphism design.
+---
+
+## ✨ Features
+
+- 🤖 **AI Compliance Assistant**: A sophisticated RAG-powered chat interface that provides accurate, source-backed answers based on indexed government PDFs.
+- 📅 **Compliance Calendar**: Track and manage critical startup deadlines. Features local and cloud persistence to ensure you never miss a filing.
+- 📚 **Regulations Library**: A searchable, centralized repository of official legal documents, acts, and guidelines from Indian authorities.
+- 💬 **Persistent Chat History**: Securely store and retrieve your conversations, powered by Neon PostgreSQL.
+- 🔐 **Secure Authentication**: Built-in user authentication and management using Firebase.
+- 🎨 **Premium UI/UX**: Fluid, responsive design with glassmorphism aesthetics, dark mode support, and smooth Framer Motion animations.
+
+---
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React (Vite), TypeScript, Tailwind CSS, Framer Motion.
-- **Backend**: FastAPI (Python), RAG with Gemini Flash 1.5.
-- **Data**: Vector storage for PDF indexing and keyword-based retrieval.
+### Frontend
+- **Framework**: [React 19](https://react.dev/) (Vite)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **Animations**: [Framer Motion](https://www.framer.com/motion/)
+- **Auth**: [Firebase](https://firebase.google.com/)
+
+### Backend
+- **API**: [FastAPI](https://fastapi.tiangolo.com/) (Python)
+- **LLM**: [Groq](https://groq.com/) (Mixtral/Llama 3)
+- **Vector DB**: [FAISS](https://github.com/facebookresearch/faiss)
+- **Embeddings**: Sentence-Transformers
+- **Database**: [Neon](https://neon.tech/) (Serverless PostgreSQL)
+
+---
+
+## 🏗️ Architecture (RAG Pipeline)
+
+```mermaid
+graph LR
+    User[Founder/User] -->|Query| API[FastAPI]
+    API -->|Embed Query| Embed[Sentence-Transformers]
+    Embed -->|Search| FAISS[Vector DB]
+    FAISS -->|Retrieve Context| API
+    API -->|Context + Query| Groq[LLM]
+    Groq -->|Generated Answer| User
+    API -->|Save History| Neon[PostgreSQL]
+```
+
+---
 
 ## 📦 Setup & Installation
 
-### Frontend
-1. Navigate to `frontend/`
-2. Install dependencies: `npm install`
-3. Set environment variable: `VITE_API_URL=http://localhost:8000`
-4. Run locally: `npm run dev`
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- Groq API Key
+- Firebase Configuration
+- Neon PostgreSQL URL
 
-### Backend
-1. Navigate to `backend/`
-2. Install requirements: `pip install -r requirements.txt`
-3. Run with uvicorn: `python main.py`
+### 1. Clone & Configure
+```bash
+git clone https://github.com/eshwar2005/LegalFinanceApp.git
+cd LegalFinanceApp
+```
 
-## 🔄 Dynamic GitHub Sync
+### 2. Backend Setup
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+pip install -r requirements.txt
+# Create a .env file with GROQ_API_KEY and DATABASE_URL
+python main.py
+```
 
-To keep your GitHub repository updated with your latest changes:
+### 3. Frontend Setup
+```bash
+cd ../frontend
+npm install
+# Create a .env file with VITE_API_URL and Firebase configs
+npm run dev
+```
 
-1. Create a new repository on GitHub named `LegalFinanceApp`.
-2. Right-click `sync-project.ps1` in this folder and select **Run with PowerShell**.
-3. The script will automatically initialize Git, stage all changes, and push them to your profile.
+---
+
+## 🔄 Deployment
+
+- **Frontend**: Deployed on [Vercel](https://vercel.com/)
+- **Backend**: Deployed on [Render](https://render.com/) / [Koyeb](https://koyeb.com/)
+- **Database**: [Neon PostgreSQL](https://neon.tech/)
+
+---
 
 ## 🔗 Author
-Developed by [eshwar2005](https://github.com/eshwar2005).
+Developed with ❤️ by [eshwar2005](https://github.com/eshwar2005).

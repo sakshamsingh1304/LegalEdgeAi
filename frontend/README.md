@@ -1,20 +1,33 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 🎨 LegalEdge AI - Frontend
 
-# Run and deploy your AI Studio app
+This is the React-based frontend for **LegalEdge AI**, an intelligent startup legal and finance assistant.
 
-This contains everything you need to run your app locally.
+## 🚀 Getting Started
 
-View your app in AI Studio: https://ai.studio/apps/drive/11sO5bV57wMkYOBOGZMrjAxcy6lhh-sDp
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
 
-## Run Locally
+2. **Configure Environment**:
+   Create a `.env` file in this directory and add:
+   ```env
+   VITE_API_URL=https://your-backend-url.com
+   # Add Firebase and other configs as needed
+   ```
 
-**Prerequisites:**  Node.js
+3. **Run Locally**:
+   ```bash
+   npm run dev
+   ```
 
+## 🛠️ Built With
+- **React 19**
+- **Vite**
+- **Tailwind CSS**
+- **Framer Motion** (Animations)
+- **Lucide React** (Icons)
+- **Firebase** (Auth)
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+---
+For full project details and backend setup, see the [Root README](../README.md).
