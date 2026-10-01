@@ -439,18 +439,41 @@ async def search_documents(q: str):
         print(f"Search error: {e}")
         return []
 
-@app.post("/api/chat", response_model=ChatResponse)
+@app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
     gen_answer = get_generate_answer()
     if gen_answer is None:
         raise HTTPException(status_code=500, detail="Backend RAG module not loaded correctly")
         
     try:
-        # Get answer from RAG
-        answer, sources_raw = gen_answer(request.query)
+        # Fetch conversation history for context continuity
+        conversation_history = []
+        if request.conversation_id:
+            conn = get_db()
+            if conn:
+                try:
+                    cur = conn.cursor()
+                    cur.execute(
+                        "SELECT role, content FROM messages WHERE conversation_id = %s::uuid ORDER BY created_at ASC",
+                        (request.conversation_id,)
+                    )
+                    rows = cur.fetchall()
+                    conversation_history = [
+                        {"role": row["role"], "content": row["content"]}
+                        for row in rows
+                    ]
+                    print(f"Loaded {len(conversation_history)} messages from conversation {request.conversation_id}")
+                except Exception as e:
+                    print(f"Error fetching conversation history: {e}")
+                finally:
+                    conn.close()
+
+        # Get answer from RAG with conversation context
+        answer, sources_raw = gen_answer(request.query, conversation_history=conversation_history)
         
         mapped_sources = []
         seen_sources = set()
+        citation_index = 0
         
         for s in sources_raw:
             # Construct a unique key to avoid duplicates
@@ -458,6 +481,7 @@ async def chat_endpoint(request: ChatRequest):
             if source_name in seen_sources:
                 continue
             seen_sources.add(source_name)
+            citation_index += 1
             
             title = source_name
             authority = "Legal Documents" # Default
@@ -465,17 +489,33 @@ async def chat_endpoint(request: ChatRequest):
                 authority = "Government Act"
             elif "rule" in title.lower():
                 authority = "Rules"
+            elif "ipr" in title.lower() or "ip" in title.lower() or "intellectual" in title.lower():
+                authority = "IP Law"
+            elif "case" in title.lower():
+                authority = "Case Law"
+            elif "guid" in title.lower():
+                authority = "Guidelines"
                 
             api_url = os.getenv("API_BASE_URL", "http://localhost:8000")
-            mapped_sources.append(Source(
-                title=title,
-                authority=authority,
-                preview=f"Referenced in {source_name}",
-                confidence=0.9, # Placeholder
-                url=f"{api_url}/data/{source_name}"
-            ))
             
-        return ChatResponse(content=answer, sources=mapped_sources)
+            # Find the first chunk text for this source as a preview
+            chunk_preview = ""
+            for raw in sources_raw:
+                if raw.get("source") == source_name:
+                    # This metadata came from our chunk texts — try to find a readable preview
+                    chunk_preview = f"Referenced in {source_name}"
+                    break
+
+            mapped_sources.append({
+                "citation_index": citation_index,
+                "title": title,
+                "authority": authority,
+                "preview": chunk_preview,
+                "confidence": 0.9,
+                "url": f"{api_url}/data/{source_name}"
+            })
+            
+        return {"content": answer, "sources": mapped_sources}
     except Exception as e:
         print(f"Error in chat_endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))

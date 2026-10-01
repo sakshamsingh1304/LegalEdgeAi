@@ -1,15 +1,126 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import PromptInputBox from '../components/PromptInputBox';
 import VoiceAssistant from '../components/VoiceAssistant';
 import { Message, Source } from '../types';
 import { streamRagApi } from '../services/geminiService';
 import { getConversations, getMessages, createConversation, saveMessage, deleteConversation, updateConversationTitle, Conversation } from '../services/chatService';
-import { Trash2, Download, Eye, FileText, Info, Loader2, Sparkles, Mic, Library, MessageSquareQuote, Plus, MessageCircle, ChevronLeft } from 'lucide-react';
+import { Trash2, Download, Eye, FileText, Info, Loader2, Sparkles, Mic, Library, MessageSquareQuote, Plus, MessageCircle, ChevronLeft, ExternalLink, BookOpen } from 'lucide-react';
 import { TextGenerateEffect } from '../components/ui/text-generate-effect';
 import { useNotifications } from '../lib/NotificationContext';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext';
+
+// ──────────────────────────────────────────────
+// Inline Citation Tag Component
+// ──────────────────────────────────────────────
+interface CitationTagProps {
+  index: number;
+  source?: Source;
+  onClick?: (index: number) => void;
+  isHighlighted?: boolean;
+}
+
+const CitationTag: React.FC<CitationTagProps> = ({ index, source, onClick, isHighlighted }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  
+  return (
+    <span className="relative inline-block mx-0.5">
+      <button
+        onClick={(e) => { e.stopPropagation(); onClick?.(index); }}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        className={`inline-flex items-center justify-center min-w-[22px] h-[20px] px-1.5 rounded-md text-[10px] font-bold transition-all duration-200 cursor-pointer
+          ${isHighlighted 
+            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-110' 
+            : 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/30 hover:text-emerald-300 hover:scale-105'
+          }`}
+        style={{ verticalAlign: 'super', fontSize: '10px', lineHeight: 1 }}
+      >
+        {index}
+      </button>
+      
+      {/* Tooltip */}
+      {showTooltip && source && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
+          <div className="glass border border-emerald-500/20 rounded-xl p-3 shadow-2xl min-w-[220px] max-w-[280px]">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[9px] font-bold">
+                {source.authority}
+              </span>
+              <span className="text-[9px] text-muted">
+                {(source.confidence * 100).toFixed(0)}% match
+              </span>
+            </div>
+            <p className="text-[11px] font-semibold text-primary truncate">{source.title}</p>
+            <p className="text-[9px] text-muted mt-1 italic line-clamp-2">"{source.preview}"</p>
+          </div>
+          <div className="w-2 h-2 glass border border-emerald-500/20 rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2" />
+        </div>
+      )}
+    </span>
+  );
+};
+
+// ──────────────────────────────────────────────
+// Parse message content and render inline citations
+// ──────────────────────────────────────────────
+interface ParsedMessageProps {
+  content: string;
+  sources?: Source[];
+  onCitationClick?: (index: number) => void;
+  highlightedCitation?: number | null;
+}
+
+const ParsedMessageContent: React.FC<ParsedMessageProps> = ({ content, sources, onCitationClick, highlightedCitation }) => {
+  const parts = useMemo(() => {
+    if (!content) return [{ type: 'text' as const, value: content }];
+    
+    // Match citation patterns like [1], [2], [3], etc.
+    const regex = /\[(\d+)\]/g;
+    const result: Array<{ type: 'text' | 'citation'; value: string; index?: number }> = [];
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = regex.exec(content)) !== null) {
+      // Add text before the citation
+      if (match.index > lastIndex) {
+        result.push({ type: 'text', value: content.slice(lastIndex, match.index) });
+      }
+      // Add the citation
+      result.push({ type: 'citation', value: match[0], index: parseInt(match[1]) });
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // Add remaining text
+    if (lastIndex < content.length) {
+      result.push({ type: 'text', value: content.slice(lastIndex) });
+    }
+    
+    return result;
+  }, [content]);
+  
+  return (
+    <span>
+      {parts.map((part, i) => {
+        if (part.type === 'citation' && part.index) {
+          const source = sources?.find(s => s.citation_index === part.index);
+          return (
+            <CitationTag 
+              key={i} 
+              index={part.index} 
+              source={source} 
+              onClick={onCitationClick}
+              isHighlighted={highlightedCitation === part.index}
+            />
+          );
+        }
+        return <span key={i}>{part.value}</span>;
+      })}
+    </span>
+  );
+};
+
 
 const ChatPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -17,7 +128,9 @@ const ChatPage: React.FC = () => {
   const [availableDocs, setAvailableDocs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [highlightedCitation, setHighlightedCitation] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sourceRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const { addNotification } = useNotifications();
   const location = useLocation();
   const isMounted = useRef(true);
@@ -116,11 +229,13 @@ const ChatPage: React.FC = () => {
     setActiveConversationId(null);
     setMessages([getWelcomeMessage()]);
     setActiveSources([]);
+    setHighlightedCitation(null);
   };
 
   const handleSelectConversation = (convId: string) => {
     preventNextLoad.current = null;
     setActiveConversationId(convId);
+    setHighlightedCitation(null);
   };
 
   const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
@@ -134,6 +249,21 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  // Handle clicking a citation — scroll to + highlight the source in the sidebar
+  const handleCitationClick = useCallback((index: number) => {
+    setHighlightedCitation(index);
+    
+    // Scroll the source card into view
+    const el = sourceRefs.current[index];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Pulse animation: clear highlight after a few seconds
+      setTimeout(() => {
+        if (isMounted.current) setHighlightedCitation(null);
+      }, 3000);
+    }
+  }, []);
+
   const handleSendMessage = async (content: string, files?: File[]) => {
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -145,6 +275,7 @@ const ChatPage: React.FC = () => {
 
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
+    setHighlightedCitation(null);
 
     // Create conversation if none active
     let convId = activeConversationId;
@@ -180,7 +311,7 @@ const ChatPage: React.FC = () => {
           m.id === assistantMsgId ? { ...m, content: streamedText } : m
         ));
       }
-    });
+    }, convId);
 
     if (result.sources) {
       if (isMounted.current) {
@@ -371,13 +502,45 @@ const ChatPage: React.FC = () => {
                   <div className="whitespace-pre-wrap leading-relaxed text-sm md:text-base max-w-none">
                     <span className="text-current">
                       {msg.role === 'assistant' ? (
-                        <TextGenerateEffect words={msg.content || "..."} duration={0.3} filter={false} className="text-current" />
+                        msg.sources && msg.sources.length > 0 ? (
+                          // Render with inline citations
+                          <ParsedMessageContent 
+                            content={msg.content || "..."}
+                            sources={msg.sources}
+                            onCitationClick={handleCitationClick}
+                            highlightedCitation={highlightedCitation}
+                          />
+                        ) : (
+                          <TextGenerateEffect words={msg.content || "..."} duration={0.3} filter={false} className="text-current" />
+                        )
                       ) : (
                         msg.content
                       )}
                     </span>
                     {!msg.content && msg.role === 'assistant' && <span className="inline-block w-2 h-4 bg-emerald-500 animate-pulse ml-1"></span>}
                   </div>
+                  
+                  {/* Inline source pills at bottom of assistant message */}
+                  {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-border/50">
+                      <BookOpen size={12} className="text-emerald-500 mt-0.5 shrink-0" />
+                      {msg.sources.map((s, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleCitationClick(s.citation_index || i + 1)}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-medium transition-all
+                            ${highlightedCitation === (s.citation_index || i + 1)
+                              ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                              : 'bg-surface hover:bg-emerald-500/15 text-muted hover:text-emerald-400 border border-border/50'
+                            }`}
+                        >
+                          <span className="font-bold">[{s.citation_index || i + 1}]</span>
+                          <span className="truncate max-w-[120px]">{s.title?.replace('.pdf', '')}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
                   <div className={`text-[10px] mt-2 ${msg.role === 'user' ? 'text-emerald-100' : 'text-muted'}`}>
                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
@@ -415,26 +578,50 @@ const ChatPage: React.FC = () => {
 
             <div className="space-y-4">
               {activeSources.length > 0 ? (
-                activeSources.map((source, i) => (
-                  <div key={i} className="p-4 rounded-2xl bg-surface hover:bg-surface-hover border border-border hover:border-emerald-500/30 transition-colors group">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold">
-                        {source.authority}
-                      </span>
-                      <span className="text-[10px] text-muted">
-                        Score: {(source.confidence * 100).toFixed(0)}%
-                      </span>
+                activeSources.map((source, i) => {
+                  const citIdx = source.citation_index || i + 1;
+                  const isActive = highlightedCitation === citIdx;
+                  return (
+                    <div 
+                      key={i} 
+                      ref={(el) => { sourceRefs.current[citIdx] = el; }}
+                      onClick={() => handleCitationClick(citIdx)}
+                      className={`p-4 rounded-2xl transition-all duration-300 cursor-pointer group ${
+                        isActive 
+                          ? 'bg-emerald-500/10 border-2 border-emerald-500/40 shadow-lg shadow-emerald-500/10 scale-[1.02]'
+                          : 'bg-surface hover:bg-surface-hover border border-border hover:border-emerald-500/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold transition-all ${
+                            isActive 
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-emerald-500/15 text-emerald-500'
+                          }`}>
+                            {citIdx}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold">
+                            {source.authority}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-muted">
+                          Score: {(source.confidence * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-bold text-primary mb-2 line-clamp-1">{source.title}</h4>
+                      <p className="text-[11px] text-muted leading-relaxed italic mb-3 line-clamp-3">
+                        "{source.preview}"
+                      </p>
+                      <a href={source.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[10px] text-emerald-500 hover:text-emerald-400 font-medium"
+                         onClick={(e) => e.stopPropagation()}>
+                        <FileText size={12} />
+                        View Original PDF
+                        <ExternalLink size={10} className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </a>
                     </div>
-                    <h4 className="text-xs font-bold text-primary mb-2 line-clamp-1">{source.title}</h4>
-                    <p className="text-[11px] text-muted leading-relaxed italic mb-3 line-clamp-3">
-                      "{source.preview}"
-                    </p>
-                    <a href={source.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[10px] text-emerald-500 hover:text-emerald-400 font-medium">
-                      <FileText size={12} />
-                      View Original PDF
-                    </a>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="flex flex-col items-center justify-center py-10 text-center space-y-4 bg-surface/30 rounded-2xl border border-white/5">
                   <div className="w-10 h-10 rounded-full bg-surface-hover flex items-center justify-center text-muted">

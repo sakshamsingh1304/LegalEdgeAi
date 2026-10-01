@@ -34,8 +34,9 @@ export interface FileData {
 }
 
 export interface Source {
+  citation_index?: number;
   title: string;
-  authority: 'MCA' | 'GST' | 'IT' | 'SEBI' | 'Startup India' | 'FDI';
+  authority: string;
   preview: string;
   confidence: number;
   url?: string;

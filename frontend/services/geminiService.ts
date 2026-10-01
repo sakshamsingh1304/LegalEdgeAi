@@ -12,8 +12,13 @@ const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/
  * Actually ChatPage.tsx uses TextGenerateEffect for completed messages, 
  * but for streaming it updates state.
  */
-export const streamRagApi = async (query: string, onChunk: (text: string) => void) => {
+export const streamRagApi = async (query: string, onChunk: (text: string) => void, conversationId?: string | null) => {
   try {
+    const body: Record<string, string> = { query };
+    if (conversationId) {
+      body.conversation_id = conversationId;
+    }
+
     const response = await fetchWithRetry(
       API_URL,
       {
@@ -21,7 +26,7 @@ export const streamRagApi = async (query: string, onChunk: (text: string) => voi
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify(body),
       },
       {
         maxRetries: 3,
