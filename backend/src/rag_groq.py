@@ -172,13 +172,77 @@ def _call_groq_with_fallback(messages, temperature=0.2, max_retries=2):
     raise Exception(f"All Groq models failed. Last error: {last_error}")
 
 
+# Pronouns / vague references that signal the query needs rewriting
+_VAGUE_PATTERNS = {"it", "this", "that", "these", "those", "them", "its", "their"}
+
+def _needs_rewrite(query: str) -> bool:
+    """Check if the query contains vague pronouns that need resolution."""
+    words = set(query.lower().split())
+    return bool(words & _VAGUE_PATTERNS) and len(words) <= 8
+
+def _rewrite_query(query: str, conversation_history: list) -> str:
+    """
+    Rewrite a vague query by resolving pronouns from conversation history.
+    Uses a fast heuristic first; falls back to LLM only if needed.
+    """
+    if not conversation_history:
+        return query
+    
+    # Heuristic: find the user question BEFORE the current one to use as topic reference.
+    # Note: The current user message is already saved to DB before the API call,
+    # so it's the LAST item in previous_user_queries. We want the one before that.
+    previous_user_queries = [
+        msg["content"] for msg in conversation_history 
+        if msg["role"] == "user"
+    ]
+    
+    # Need at least 2 user queries: the current one + a prior one with the topic
+    if len(previous_user_queries) < 2:
+        return query
+    
+    # The second-to-last user query is the one with the actual topic
+    prior_user_query = previous_user_queries[-2]
+    
+    # Simple rewrite: replace common pronoun patterns with the actual topic
+    # Extract key topic words from last query (skip common stop words)
+    stop_words = {"define", "what", "is", "a", "an", "the", "how", "does", "do", "can", 
+                  "tell", "me", "about", "explain", "describe", "give", "are", "was", "were",
+                  "in", "of", "to", "for", "and", "or", "with", "on", "at", "by", "from"}
+    topic_words = [w for w in prior_user_query.split() if w.lower() not in stop_words]
+    
+    if not topic_words:
+        return query
+    
+    topic = " ".join(topic_words)
+    
+    # Replace pronouns in the current query with the topic
+    rewritten = query
+    for pronoun in _VAGUE_PATTERNS:
+        # Case-insensitive whole-word replacement
+        import re
+        rewritten = re.sub(
+            r'\b' + pronoun + r'\b', 
+            topic, 
+            rewritten, 
+            flags=re.IGNORECASE
+        )
+    
+    print(f"Query rewritten: '{query}' -> '{rewritten}' (topic from: '{prior_user_query}')")
+    return rewritten
+
+
 # RAG PROMPT
 def generate_answer(query, conversation_history=None):
     """
     Generate an answer using RAG.
     conversation_history: optional list of {"role": "user"|"assistant", "content": str}
     """
-    retrieved_items = retrieve(query)
+    # Rewrite vague queries (e.g. "define it") by resolving pronouns from history
+    search_query = query
+    if conversation_history and _needs_rewrite(query):
+        search_query = _rewrite_query(query, conversation_history)
+    
+    retrieved_items = retrieve(search_query)
     chunks = [item["text"] for item in retrieved_items]
     
     # Extract sources for returning alongside answer
@@ -212,17 +276,33 @@ def generate_answer(query, conversation_history=None):
     # Build conversation history section for context continuity
     history_section = ""
     if conversation_history and len(conversation_history) > 0:
-        # Keep last 6 messages (3 exchanges) to stay within token limits
-        recent = conversation_history[-6:]
+        # Keep last 8 messages (4 exchanges) to stay within token limits
+        recent = conversation_history[-8:]
+        
+        # Error/fallback messages to filter out of history
+        ERROR_MARKERS = [
+            "Quota Limit",
+            "unable to generate a detailed text response",
+            "high API traffic",
+            "Could not connect to the backend",
+        ]
+        
         history_lines = []
         for msg in recent:
             role_label = "User" if msg["role"] == "user" else "Assistant"
-            # Truncate long assistant responses to save tokens
             content = msg["content"]
+            
+            # Skip assistant error/fallback messages — they add no useful context
+            if msg["role"] == "assistant" and any(marker in content for marker in ERROR_MARKERS):
+                history_lines.append(f"Assistant: [previous response failed — no answer was generated]")
+                continue
+            
+            # Truncate long assistant responses to save tokens
             if msg["role"] == "assistant" and len(content) > 500:
                 content = content[:500] + "..."
             history_lines.append(f"{role_label}: {content}")
-        history_section = "\n\nConversation History (for context on follow-up questions):\n" + "\n".join(history_lines) + "\n"
+        
+        history_section = "\n\nConversation History (for context on follow-up questions):\n" + "\n".join(history_lines) + "\n\nIMPORTANT: When the user uses pronouns like 'it', 'this', 'that', 'these', or 'them', resolve them based on the USER's previous questions, NOT the assistant's failed responses. Focus on the actual topic the user asked about.\n"
 
     prompt = f"""You are a legal compliance assistant. Answer ONLY based on the provided context documents.
 If the answer is not in context, say: "Information not found in provided documents."
